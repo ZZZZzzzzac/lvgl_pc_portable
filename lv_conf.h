@@ -424,7 +424,7 @@
      *  - LV_LOG_LEVEL_ERROR    Log only critical issues, when system may fail.
      *  - LV_LOG_LEVEL_USER     Log only custom log messages added by the user.
      *  - LV_LOG_LEVEL_NONE     Do not log anything. */
-    #define LV_LOG_LEVEL LV_LOG_LEVEL_WARN
+    #define LV_LOG_LEVEL LV_LOG_LEVEL_TRACE
 
     /** - 1: Print log with 'printf';
      *  - 0: User needs to register a callback with `lv_log_register_print_cb()`. */
@@ -1048,7 +1048,7 @@
 /* Documentation for several of the below items can be found here: https://docs.lvgl.io/master/auxiliary-modules/index.html . */
 
 /** 1: Enable API to take snapshot for object */
-#define LV_USE_SNAPSHOT 0
+#define LV_USE_SNAPSHOT 1
 
 /** 1: Enable system monitor component */
 #define LV_USE_SYSMON   1

@@ -1,4 +1,6 @@
 #include "demo_direct_draw.h"
+#include "lvgl/lvgl.h"
+#include "lvgl/src/misc/lv_area_private.h"
 #include <stdio.h>
 
 /**
@@ -37,7 +39,7 @@ static void direct_draw_event_cb(lv_event_t * e)
 
         /* 计算组件与剪裁区域的交集 */
         lv_area_t draw_area;
-        if(!_lv_area_intersect(&draw_area, &obj_area, &clip_area)) {
+        if(!lv_area_intersect(&draw_area, &obj_area, &clip_area)) {
             return; /* 无交集，无需绘制 */
         }
 

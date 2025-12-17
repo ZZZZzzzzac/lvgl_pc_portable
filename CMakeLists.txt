@@ -77,7 +77,15 @@ if(USE_FREERTOS)
     list(APPEND MAIN_SOURCES src/freertos_main.c src/freertos/freertos_posix_port.c ${FREERTOS_SOURCES})
     list(APPEND MAIN_LIBS freertos_config freertos_kernel)
 else()
-    list(APPEND MAIN_SOURCES src/main.c)
+    # Automatically include all .c and .cpp files in src/
+    # We use CONFIGURE_DEPENDS so cmake re-runs when files are added/removed
+    file(GLOB APP_SOURCES CONFIGURE_DEPENDS "src/*.c" "src/*.cpp")
+
+    # Filter out files that are conditional or already included
+    list(FILTER APP_SOURCES EXCLUDE REGEX ".*freertos_main\\.c$")      # Only for FreeRTOS build
+    list(FILTER APP_SOURCES EXCLUDE REGEX ".*mouse_cursor_icon\\.c$")  # Already added in MAIN_SOURCES
+
+    list(APPEND MAIN_SOURCES ${APP_SOURCES})
 endif()
 
 

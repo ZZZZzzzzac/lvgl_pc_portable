@@ -33,6 +33,7 @@
 
 #include "transform_3d.h"
 #include "demo_direct_draw.h"
+#include "demo_snapshot_verification.h"
 
 /*********************
  *      DEFINES
@@ -295,7 +296,8 @@ int main(int argc, char **argv)
     // very_simple_demo();
     // lv_example_canvas_1();
     // lv_example_obj_3();
-    lv_demo_direct_draw();
+    // lv_demo_direct_draw();
+    run_demo_snapshot_verification();
 
     while(1) {
         /* Periodically call the lv_task handler.

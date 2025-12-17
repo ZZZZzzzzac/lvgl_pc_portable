@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-#include "../lvgl/lvgl.h"
-
 /**
  * 运行直接绘制演示 (Demo 1)
  * 创建一个自定义组件，通过直接访问 draw_buf 绘制红色区域

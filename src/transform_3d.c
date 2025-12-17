@@ -482,52 +482,6 @@ static bool is_face_visible(const int32_t face_vertices[4], const Coord3D* trans
     return normal_z > 0;
 }
 
-void process_faces_and_get_matrices(const TransformConfig3D* config)
-{
-    if (!config) {
-        return;
-    }
-
-    int visible_face_count = 0;
-
-    // Iterate over each face
-    for (uint32_t i = 0; i < config->faces_len; ++i)
-    {
-        const CoordFace* face = &config->faces_ptr[i];
-        lv_obj_t* obj = config->faces_obj[i];
-
-        // 1. Back-face culling
-        // 这里我只画了正面可见的几个面，不过我看矩形那个demo，棱柱是画了所有面的。
-        if (!is_face_visible(face->vertex_indices, config->vertices_tra)) {
-            lv_matrix_identity(&config->faces_mat[i]);
-            lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
-            continue; // Skip back-facing polygons
-        }
-        lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
-
-        // config->vertices_pro就是3d图形的四边形面投影在表盘上的坐标
-        // 整个3x3矩阵的作用就是，将图片的4个角的矩形坐标转换到3d图形面的四个角的平行四边形坐标
-        const Coord2D dst_points[4] = {
-            config->vertices_pro[face->vertex_indices[1]],
-            config->vertices_pro[face->vertex_indices[2]],
-            config->vertices_pro[face->vertex_indices[3]],
-            config->vertices_pro[face->vertex_indices[0]],
-        };
-        int32_t x = lv_obj_get_x(obj);
-        int32_t y = lv_obj_get_y(obj);
-        int32_t w = lv_obj_get_width(obj);
-        int32_t h = lv_obj_get_height(obj);
-        const Coord2D src_points[4] = {
-            {x,y},{x,y+h},{x+w,y+h},{x+w,y}
-        };
-        // 3. Calculate the inverse perspective transform matrix
-        // 不确定lvgl里需要的矩阵是正向的还是逆矩阵。总之调换src_point和dst_point就能得到正矩阵或逆矩阵，实际测测看吧。
-       int result = calculate_inverse_transform_matrix(dst_points, src_points, config->faces_mat[i].m);
-
-       lv_obj_set_transform(obj, &config->faces_mat[i]);
-    }
-}
-
 /**
  * @brief 检查点是否在四边形内部（使用向量叉积算法）。
  *
@@ -575,4 +529,51 @@ bool point_in_quad(const Coord2D point, const Coord2D quad[4])
 
     // 如果所有叉积的符号都一致（或为零），则点在四边形内部或边上
     return true;
+}
+
+
+void process_faces_and_get_matrices(const TransformConfig3D* config)
+{
+    if (!config) {
+        return;
+    }
+
+    int visible_face_count = 0;
+
+    // Iterate over each face
+    for (uint32_t i = 0; i < config->faces_len; ++i)
+    {
+        const CoordFace* face = &config->faces_ptr[i];
+        lv_obj_t* obj = config->faces_obj[i];
+
+        // 1. Back-face culling
+        // 这里我只画了正面可见的几个面，不过我看矩形那个demo，棱柱是画了所有面的。
+        if (!is_face_visible(face->vertex_indices, config->vertices_tra)) {
+            lv_matrix_identity(&config->faces_mat[i]);
+            lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+            continue; // Skip back-facing polygons
+        }
+        lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
+
+        // config->vertices_pro就是3d图形的四边形面投影在表盘上的坐标
+        // 整个3x3矩阵的作用就是，将图片的4个角的矩形坐标转换到3d图形面的四个角的平行四边形坐标
+        const Coord2D dst_points[4] = {
+            config->vertices_pro[face->vertex_indices[1]],
+            config->vertices_pro[face->vertex_indices[2]],
+            config->vertices_pro[face->vertex_indices[3]],
+            config->vertices_pro[face->vertex_indices[0]],
+        };
+        int32_t x = lv_obj_get_x(obj);
+        int32_t y = lv_obj_get_y(obj);
+        int32_t w = lv_obj_get_width(obj);
+        int32_t h = lv_obj_get_height(obj);
+        const Coord2D src_points[4] = {
+            {x,y},{x,y+h},{x+w,y+h},{x+w,y}
+        };
+        // 3. Calculate the inverse perspective transform matrix
+        // 不确定lvgl里需要的矩阵是正向的还是逆矩阵。总之调换src_point和dst_point就能得到正矩阵或逆矩阵，实际测测看吧。
+       int result = calculate_inverse_transform_matrix(dst_points, src_points, config->faces_mat[i].m);
+
+       lv_obj_set_transform(obj, &config->faces_mat[i]);
+    }
 }

@@ -50,7 +50,7 @@ typedef struct {
 
 **关于 `layer_set_pixel` 的说明**:
 LVGL 没有标准的 `layer_set_pixel` API。我们需要直接访问 `lv_layer_t` 内部的 `draw_buf`。
-*   在 LVGL v9 中，可以通过 `lv_draw_buf_get_buf(layer->draw_buf)` 获取原始指针。
+*   在 LVGL v9 中，可以通过 `layer->draw_buf->data` 获取原始指针。
 *   我们需要根据 `color_format` (如 RGB565) 手动计算偏移量并写入像素。
 
 ```c
@@ -61,7 +61,7 @@ static void lv_3d_face_draw_event_cb(lv_event_t * e) {
 
     // 0. 获取图层缓冲区的原始指针 (Direct Buffer Access)
     // 注意：这需要包含 LVGL 内部头文件或使用特定的 draw_buf API
-    uint8_t * buf_start = lv_draw_buf_get_buf(layer->draw_buf);
+    uint8_t * buf_start = layer->draw_buf->data;
     uint32_t stride = layer->draw_buf->header.stride;
     int32_t buf_w = layer->draw_buf->header.w;
     int32_t buf_h = layer->draw_buf->header.h;
