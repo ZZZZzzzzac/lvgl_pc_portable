@@ -24,7 +24,10 @@ float calculate_edge_cross(float x, float y,
                           float x0, float y0,
                           float x1, float y1);
 
-// 双线性插值
+// 双线性插值 (基于 lv_obj/lv_canvas)
 lv_color32_t bilinear_interpolation(lv_obj_t* image, float src_x, float src_y);
+
+// 双线性插值 (基于 lv_draw_buf_t, 优化为直接返回 RGB565 uint16_t)
+uint16_t bilinear_interpolation_draw_buf_rgb565(lv_draw_buf_t* buf, float src_x, float src_y);
 
 #endif // BASIC_MATH_H

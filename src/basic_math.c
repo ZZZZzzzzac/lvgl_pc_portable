@@ -198,3 +198,81 @@ lv_color32_t bilinear_interpolation(lv_obj_t* obj, float src_x, float src_y) {
 
     return interpolated_color;
 }
+
+// 优化的 RGB565 双线性插值，无中间结构体转换
+uint16_t bilinear_interpolation_draw_buf_rgb565(lv_draw_buf_t* buf, float src_x, float src_y) {
+    int32_t w = buf->header.w;
+    int32_t h = buf->header.h;
+    uint32_t stride = buf->header.stride;
+    const uint8_t * data = buf->data;
+
+#if BILINEAR_INTERPOLATION_BOUNDS_CHECK
+    if (src_x < 0 || src_y < 0 || src_x >= w || src_y >= h) {
+        return 0;
+    }
+#endif
+
+    // 1. 浮点坐标钳位 (Clamp to Edge)
+    // 必须在转整数前处理，防止负数或溢出导致权重(wx,wy)超出[0,1]范围，进而产生错误的颜色外推
+    if (src_x < 0) src_x = 0;
+    if (src_y < 0) src_y = 0;
+    if (src_x > w - 1) src_x = w - 1;
+    if (src_y > h - 1) src_y = h - 1;
+
+    // 2. 计算整数坐标
+    int x0 = (int)src_x;
+    int y0 = (int)src_y;
+
+    // 3. 计算相邻像素坐标 (由于src_x已钳位到w-1，x0最大为w-1，此时x1=w-1)
+    int x1 = (x0 + 1 < w) ? x0 + 1 : x0;
+    int y1 = (y0 + 1 < h) ? y0 + 1 : y0;
+
+    // 4. 计算权重
+    float wx = src_x - x0;
+    float wy = src_y - y0;
+
+    // 权重因子
+    float w00 = (1.0f - wx) * (1.0f - wy);
+    float w01 = wx * (1.0f - wy);
+    float w10 = (1.0f - wx) * wy;
+    float w11 = wx * wy;
+
+    // 4. 读取 4 个邻域像素 (RGB565)
+    const uint8_t * row0 = data + y0 * stride;
+    const uint8_t * row1 = data + y1 * stride;
+
+    uint16_t p00 = *((const uint16_t*)row0 + x0);
+    uint16_t p01 = *((const uint16_t*)row0 + x1);
+    uint16_t p10 = *((const uint16_t*)row1 + x0);
+    uint16_t p11 = *((const uint16_t*)row1 + x1);
+
+    // 5. 解包并计算 (R:5, G:6, B:5)
+    // Red (Mask 0xF800 >> 11)
+    float r = w00 * ((p00 & 0xF800) >> 11) +
+              w01 * ((p01 & 0xF800) >> 11) +
+              w10 * ((p10 & 0xF800) >> 11) +
+              w11 * ((p11 & 0xF800) >> 11);
+
+    // Green (Mask 0x07E0 >> 5)
+    float g = w00 * ((p00 & 0x07E0) >> 5) +
+              w01 * ((p01 & 0x07E0) >> 5) +
+              w10 * ((p10 & 0x07E0) >> 5) +
+              w11 * ((p11 & 0x07E0) >> 5);
+
+    // Blue (Mask 0x001F)
+    float b = w00 * (p00 & 0x001F) +
+              w01 * (p01 & 0x001F) +
+              w10 * (p10 & 0x001F) +
+              w11 * (p11 & 0x001F);
+
+    // 6. 打包回 RGB565
+    uint16_t res_r = (uint16_t)r;
+    uint16_t res_g = (uint16_t)g;
+    uint16_t res_b = (uint16_t)b;
+
+    if (res_r > 31) res_r = 31;
+    if (res_g > 63) res_g = 63;
+    if (res_b > 31) res_b = 31;
+
+    return (res_r << 11) | (res_g << 5) | res_b;
+}
