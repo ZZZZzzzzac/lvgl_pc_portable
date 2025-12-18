@@ -5,6 +5,10 @@
 #include <stdbool.h>
 #include "lvgl/lvgl.h"
 
+#define DISP_HOR_RES 240
+#define DISP_VER_RES 296
+#define DISP_CUBE_SIZE 180
+
 // 顶点结构体 (x, y, z)
 typedef struct {
     float x, y, z;
@@ -58,17 +62,6 @@ TransformConfig3D* transform_config_3d_create_prism(
     uint32_t canvas_width, uint32_t canvas_height
 );
 
-// 变换应用函数
-int apply_transformations_3d(TransformConfig3D* config);
-
-int calculate_inverse_transform_matrix(
-    const Coord2D src_points[4],
-    const Coord2D dst_points[4],
-    float out_matrix[3][3]
-);
-
-void process_faces_and_get_matrices(const TransformConfig3D* config);
-
-bool point_in_quad(const Coord2D point, const Coord2D quad[4]);
+void demo(void);
 
 #endif // TRANSFORM_3D_H

@@ -8,3 +8,4 @@ bin/
 # VSCode
 .vscode
 msys2
+*.log
