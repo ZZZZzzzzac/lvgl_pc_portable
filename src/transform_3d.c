@@ -291,7 +291,7 @@ static int apply_transformations_3d()
     for (uint32_t i = 0; i < g_cube->vertices_len; i++) {
         const Coord3D* vertex = &g_cube->vertices_ptr[i];
         float vertex_array[3] = {vertex->x, vertex->y, vertex->z};
-        float transformed_array[3];
+        float transformed_array[3] = {0};
 
         // 应用旋转变换
         matrix_vector_multiply_3x3(matrix_a, vertex_array, transformed_array);
@@ -538,54 +538,35 @@ void demo(void)
     g_snapshot_buf = lv_snapshot_create_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565);
 
     // Create faces on OFF-SCREEN root
-    lv_obj_t * obj1 = lv_obj_create(g_offscreen_root);
-    lv_obj_t * obj2 = lv_obj_create(g_offscreen_root);
-    lv_obj_t * obj3 = lv_obj_create(g_offscreen_root);
-    lv_obj_t * obj4 = lv_obj_create(g_offscreen_root);
-    lv_obj_t * obj5 = lv_obj_create(g_offscreen_root);
-    lv_obj_t * obj6 = lv_obj_create(g_offscreen_root);
-
-    lv_obj_add_flag(obj1, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(obj2, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(obj3, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(obj4, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(obj5, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(obj6, LV_OBJ_FLAG_HIDDEN);
-
-    lv_obj_set_style_bg_color(obj1, lv_color_make(255, 255,   0), 0);
-    lv_obj_set_style_bg_color(obj2, lv_color_make(  0,   0,   0), 0);
-    lv_obj_set_style_bg_color(obj3, lv_color_make(255,   0,   0), 0);
-    lv_obj_set_style_bg_color(obj4, lv_color_make(  0, 255,   0), 0);
-    lv_obj_set_style_bg_color(obj5, lv_color_make(  0,   0, 255), 0);
-    lv_obj_set_style_bg_color(obj6, lv_color_make(255, 255, 255), 0);
-
-    lv_obj_t * objs[] = {obj1, obj2, obj3, obj4, obj5, obj6};
     for (int i = 0; i < 6; i++)
     {
-        lv_obj_set_size(objs[i], 100, 100);
-        g_cube->faces_obj[i] = objs[i];
+        lv_obj_t * obj = lv_obj_create(g_offscreen_root);
+        g_cube->faces_obj[i] = obj;
+        // lv_obj_remove_style_all(obj);
+        lv_obj_set_style_radius(obj, 0, LV_PART_MAIN);
+        lv_obj_set_size(obj, 100, 100);
+        lv_obj_set_style_bg_color(obj, lv_color_make(255*(i&0b1), 255*(i&0b10), 255*(i&0b100)), 0);
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
 
-        lv_obj_t * label = lv_label_create(objs[i]);
+        lv_obj_t * label = lv_label_create(obj);
         lv_obj_set_style_text_font(label, &lv_font_montserrat_20, 0);
         lv_label_set_text(label, "text");
         lv_obj_center(label);
 
-        lv_obj_t * sub_obj1 = lv_obj_create(objs[i]);
+        lv_obj_t * sub_obj1 = lv_obj_create(obj);
         lv_obj_set_size(sub_obj1, 40, 40);
         lv_obj_set_style_bg_color(sub_obj1, lv_color_make(255, 0, 255), 0);
         lv_obj_align(sub_obj1, LV_ALIGN_TOP_LEFT, 5, 5);
 
-        lv_obj_t * btn = lv_button_create(objs[i]);
-        lv_obj_set_size(btn, 100, 40);
+        lv_obj_t * btn = lv_button_create(obj);
+        lv_obj_set_size(btn, 80, 40);
         lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, -10);
         lv_obj_t * btn_lbl = lv_label_create(btn);
         lv_label_set_text(btn_lbl, "Click Me");
         lv_obj_center(btn_lbl);
 
-        lv_obj_update_layout(objs[i]);
+        lv_obj_update_layout(obj);
     }
-
-
 
 #if ENABLE_AUTO_ROTATION
     lv_timer_create(auto_rotate_timer_cb, 30, NULL);
@@ -608,5 +589,7 @@ void demo(void)
     g_cube->rotation_deg[1] = 40.0f;
     g_cube->rotation_deg[2] = 0.0f;
 
+    lv_obj_update_layout(g_display_obj); // Ensure size is valid for apply_transformations
     apply_transformations_3d();
+    lv_obj_invalidate(g_display_obj); // Force initial draw
 }

@@ -7,7 +7,7 @@
 
 #define DISP_HOR_RES 240
 #define DISP_VER_RES 296
-#define DISP_CUBE_SIZE 180
+#define DISP_CUBE_SIZE 240
 
 // 顶点结构体 (x, y, z)
 typedef struct {
