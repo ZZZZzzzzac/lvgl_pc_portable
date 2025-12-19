@@ -79,8 +79,8 @@ void very_simple_demo(void)
     // lv_obj_set_transform(obj1, &matrix);
 }
 
-FILE *mylog;
-FILE *log_file;
+FILE *prof_log;
+FILE *event_log;
 #if LV_USE_PROFILER
 static uint64_t my_get_tick_cb(void)
 {
@@ -96,7 +96,7 @@ static uint64_t my_get_tick_cb(void)
 }
 static void my_log_print_cb(const char * buf)
 {
-    fprintf(mylog, "%s", buf);
+    fprintf(prof_log, "%s", buf);
 }
 void my_profiler_init(void)
 {
@@ -123,9 +123,9 @@ void my_profiler_init(void)
 static void log_to_file_cb(lv_log_level_t level, const char * buf)
 {
     LV_UNUSED(level);
-    if(log_file) {
-        fprintf(log_file, "%s", buf);
-        fflush(log_file);
+    if(event_log) {
+        fprintf(event_log, "%s", buf);
+        fflush(event_log);
     }
 }
 
@@ -135,8 +135,8 @@ int main(int argc, char **argv)
 {
     (void)argc; /*Unused*/
     (void)argv; /*Unused*/
-    mylog = fopen("lvgl_profiler.log", "w");
-    log_file = fopen("lvgl.log", "w");
+    prof_log = fopen("lvgl_profiler.log", "w");
+    event_log = fopen("lvgl.log", "w");
     /*Initialize LVGL*/
     lv_init();
 #if LV_USE_LOG != 0
@@ -153,7 +153,7 @@ int main(int argc, char **argv)
     /* - etc. */
     // lv_demo_widgets();
     // lv_demo_benchmark();
-    // my_profiler_init();
+    my_profiler_init();
     demo();
     // very_simple_demo();
     // lv_example_canvas_1();
@@ -174,7 +174,8 @@ int main(int argc, char **argv)
         usleep(sleep_time_ms * 1000);
     #endif
     }
-    fclose(mylog);
+    fclose(prof_log);
+    fclose(event_log);
     return 0;
 }
 

@@ -9,3 +9,4 @@ bin/
 .vscode
 msys2
 *.log
+*.systrace

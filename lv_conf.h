@@ -415,7 +415,7 @@
  *-----------*/
 
 /** Enable log module */
-#define LV_USE_LOG 1
+#define LV_USE_LOG 0
 #if LV_USE_LOG
     /** Set value to one of the following levels of logging detail:
      *  - LV_LOG_LEVEL_TRACE    Log detailed information.
@@ -1083,7 +1083,7 @@
 #endif /*LV_USE_SYSMON*/
 
 /** 1: Enable runtime performance profiler */
-#define LV_USE_PROFILER 0
+#define LV_USE_PROFILER 1
 #if LV_USE_PROFILER
     /** 1: Enable the built-in profiler */
     #define LV_USE_PROFILER_BUILTIN 1

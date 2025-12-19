@@ -27,7 +27,7 @@ static lv_draw_buf_t * g_snapshot_buf = NULL;
 static TransformConfig3D* transform_config_3d_create(
     uint32_t canvas_width, uint32_t canvas_height)
 {
-    TransformConfig3D* config = (TransformConfig3D*)malloc(sizeof(TransformConfig3D));
+    TransformConfig3D* config = (TransformConfig3D*)lv_malloc(sizeof(TransformConfig3D));
     if (!config) {
         return NULL;
     }
@@ -95,13 +95,12 @@ TransformConfig3D* transform_config_3d_create_cube(
 
     config->vertices_len = 8;
     config->faces_len = 6;
-    config->faces_ptr = (CoordFace*)malloc(sizeof(CoordFace) * config->faces_len);
-    config->faces_obj = (lv_obj_t**)malloc(sizeof(lv_obj_t*) * config->faces_len);
-    config->faces_mat = (lv_matrix_t*)malloc(sizeof(lv_matrix_t) * config->faces_len);
-    config->vertices_ptr = (Coord3D*)malloc(sizeof(Coord3D) * config->vertices_len);
-    config->vertices_pro = (Coord2D*)malloc(sizeof(Coord2D) * config->vertices_len);
-    config->vertices_tra = (Coord3D*)malloc(sizeof(Coord3D) * config->vertices_len);
-
+    config->faces_ptr = (CoordFace*)lv_malloc(sizeof(CoordFace) * config->faces_len);
+    config->faces_obj = (lv_obj_t**)lv_malloc(sizeof(lv_obj_t*) * config->faces_len);
+    config->faces_mat = (lv_matrix_t*)lv_malloc(sizeof(lv_matrix_t) * config->faces_len);
+    config->vertices_ptr = (Coord3D*)lv_malloc(sizeof(Coord3D) * config->vertices_len);
+    config->vertices_pro = (Coord2D*)lv_malloc(sizeof(Coord2D) * config->vertices_len);
+    config->vertices_tra = (Coord3D*)lv_malloc(sizeof(Coord3D) * config->vertices_len);
     if (
         !config->vertices_pro ||
         !config->vertices_tra ||
@@ -178,12 +177,11 @@ TransformConfig3D* transform_config_3d_create_prism(
         return NULL;
 
     config->vertices_len = n_sides * 2;
-    config->vertices_ptr = (Coord3D*)malloc(sizeof(Coord3D) * config->vertices_len);
-    config->vertices_pro = (Coord2D*)malloc(sizeof(Coord2D) * config->vertices_len);
-    config->vertices_tra = (Coord3D*)malloc(sizeof(Coord3D) * config->vertices_len);
-    config->faces_ptr = (CoordFace*)malloc(sizeof(CoordFace) * n_sides);
-    config->faces_mat = (lv_matrix_t*)malloc(sizeof(lv_matrix_t) * n_sides);
-
+    config->vertices_ptr = (Coord3D*)lv_malloc(sizeof(Coord3D) * config->vertices_len);
+    config->vertices_pro = (Coord2D*)lv_malloc(sizeof(Coord2D) * config->vertices_len);
+    config->vertices_tra = (Coord3D*)lv_malloc(sizeof(Coord3D) * config->vertices_len);
+    config->faces_ptr = (CoordFace*)lv_malloc(sizeof(CoordFace) * n_sides);
+    config->faces_mat = (lv_matrix_t*)lv_malloc(sizeof(lv_matrix_t) * n_sides);
     if (
         !config->vertices_pro ||
         !config->vertices_tra ||
@@ -326,6 +324,7 @@ static int apply_transformations_3d()
  */
 static void snapshot_draw_event_cb(lv_event_t * e)
 {
+    LV_PROFILER_BEGIN_TAG("snapshot_draw_event_cb");
     lv_event_code_t code = lv_event_get_code(e);
     if(code != LV_EVENT_DRAW_MAIN) return;
 
@@ -360,19 +359,23 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         lv_obj_remove_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
         lv_obj_align(face_obj, LV_ALIGN_TOP_LEFT, 0, 0);
 
-        // Dynamic scale calculation to fit 100x100
+        // 性能优化：不再缩放face_obj。
+        // 使用transform_scale会导致LVGL在渲染时申请巨大的临时图层缓冲(ARGB8888)，造成内存尖峰和抖动。
+        // 改为调整wrapper大小以匹配face_obj的原始尺寸，进行1:1快照。
+        // 最终的缩放由3D纹理映射的双线性插值自动处理。
         int32_t obj_w = lv_obj_get_width(face_obj);
         int32_t obj_h = lv_obj_get_height(face_obj);
 
-        if(obj_w > 0) {
-            int32_t scale_x = (100 * 256) / obj_w;
-            lv_obj_set_style_transform_scale_x(face_obj, scale_x, 0);
+        if(obj_w < 1) obj_w = 1;
+        if(obj_h < 1) obj_h = 1;
+
+        // 调整容器大小以适应内容
+        if (lv_obj_get_width(g_wrapper_obj) != obj_w || lv_obj_get_height(g_wrapper_obj) != obj_h) {
+            lv_obj_set_size(g_wrapper_obj, obj_w, obj_h);
         }
 
-        if(obj_h > 0) {
-            int32_t scale_y = (100 * 256) / obj_h;
-            lv_obj_set_style_transform_scale_y(face_obj, scale_y, 0);
-        }
+        // 确保清除之前的缩放设置（如果有）
+        lv_obj_set_style_transform_scale(face_obj, 256, 0);
 
         // Update layout to ensure rendering is correct
         lv_obj_update_layout(g_wrapper_obj);
@@ -416,7 +419,7 @@ static void snapshot_draw_event_cb(lv_event_t * e)
 
         // Optimization: Use bounding box of the face to limit the loop would be better,
         // but for now iterating the draw area is safer.
-
+        LV_PROFILER_BEGIN_TAG("double_for_loop");
         for(int32_t draw_y = draw_area.y1; draw_y <= draw_area.y2; draw_y++) {
             uint32_t dest_y_idx = (draw_y - layer->buf_area.y1);
             uint8_t * dest_row = dest_buf_start + (dest_y_idx * dest_stride);
@@ -440,7 +443,9 @@ static void snapshot_draw_event_cb(lv_event_t * e)
                 *dst_px = color;
             }
         }
+        LV_PROFILER_END_TAG("double_for_loop");
     }
+    LV_PROFILER_END_TAG("snapshot_draw_event_cb");
 }
 
 
@@ -449,7 +454,9 @@ static void auto_rotate_timer_cb(lv_timer_t * timer)
     if(!g_cube) return;
     g_cube->rotation_deg[1] += 1.0f; // Rotate Y
     g_cube->rotation_deg[0] += 0.5f; // Rotate X
+    LV_PROFILER_BEGIN_TAG("apply_transformations_3d");
     apply_transformations_3d();
+    LV_PROFILER_END_TAG("apply_transformations_3d");
     lv_obj_invalidate(g_display_obj);
 }
 
@@ -525,18 +532,6 @@ void demo(void)
     // Register draw callback
     lv_obj_add_event_cb(g_display_obj, snapshot_draw_event_cb, LV_EVENT_DRAW_MAIN, NULL);
 
-    g_wrapper_obj = lv_obj_create(g_offscreen_root);
-    lv_obj_remove_style_all(g_wrapper_obj);
-    lv_obj_set_size(g_wrapper_obj, 100, 100);
-    lv_obj_align(g_wrapper_obj, LV_ALIGN_TOP_LEFT, 0, 0);
-    // Make it opaque to optimize memory/perf
-    lv_obj_set_style_bg_opa(g_wrapper_obj, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(g_wrapper_obj, lv_color_black(), 0);
-    lv_obj_remove_flag(g_wrapper_obj, LV_OBJ_FLAG_HIDDEN); // Make sure it's "visible" on the off-screen
-
-    // Pre-allocate snapshot buffer (using wrapper's size)
-    g_snapshot_buf = lv_snapshot_create_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565);
-
     // Create faces on OFF-SCREEN root
     for (int i = 0; i < 6; i++)
     {
@@ -544,6 +539,7 @@ void demo(void)
         g_cube->faces_obj[i] = obj;
         // lv_obj_remove_style_all(obj);
         lv_obj_set_style_radius(obj, 0, LV_PART_MAIN);
+        // User can change size here to test mixed sizes
         lv_obj_set_size(obj, 200, 200);
         lv_obj_set_style_bg_color(obj, lv_color_make(255*(i&0b1), 255*(i&0b10), 255*(i&0b100)), 0);
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
@@ -567,6 +563,31 @@ void demo(void)
 
         lv_obj_update_layout(obj);
     }
+
+    // Determine max face size to allocate sufficient buffer initially
+    int32_t max_w = 1;
+    int32_t max_h = 1;
+    for(int i = 0; i < 6; i++) {
+        if(g_cube->faces_obj[i]) {
+            int32_t w = lv_obj_get_width(g_cube->faces_obj[i]);
+            int32_t h = lv_obj_get_height(g_cube->faces_obj[i]);
+            if(w > max_w) max_w = w;
+            if(h > max_h) max_h = h;
+        }
+    }
+    g_wrapper_obj = lv_obj_create(g_offscreen_root);
+    lv_obj_remove_style_all(g_wrapper_obj);
+    lv_obj_set_size(g_wrapper_obj, max_w, max_h);
+    // Initial size will be set later based on max face size
+    lv_obj_align(g_wrapper_obj, LV_ALIGN_TOP_LEFT, 0, 0);
+    // Make it opaque to optimize memory/perf
+    lv_obj_set_style_bg_opa(g_wrapper_obj, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(g_wrapper_obj, lv_color_black(), 0);
+    lv_obj_remove_flag(g_wrapper_obj, LV_OBJ_FLAG_HIDDEN); // Make sure it's "visible" on the off-screen
+
+    // Initialize wrapper and buffer with max size to avoid early reallocation
+    lv_obj_update_layout(g_wrapper_obj);
+    g_snapshot_buf = lv_snapshot_create_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565);
 
 #if ENABLE_AUTO_ROTATION
     lv_timer_create(auto_rotate_timer_cb, 30, NULL);
