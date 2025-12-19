@@ -449,7 +449,7 @@
     #define LV_LOG_TRACE_INDEV      0   /**< Enable/disable trace logs in input device operations. */
     #define LV_LOG_TRACE_DISP_REFR  0   /**< Enable/disable trace logs in display re-draw operations. */
     #define LV_LOG_TRACE_EVENT      0   /**< Enable/disable trace logs in event dispatch logic. */
-    #define LV_LOG_TRACE_OBJ_CREATE 1   /**< Enable/disable trace logs in object creation (core `obj` creation plus every widget). */
+    #define LV_LOG_TRACE_OBJ_CREATE 0   /**< Enable/disable trace logs in object creation (core `obj` creation plus every widget). */
     #define LV_LOG_TRACE_LAYOUT     0   /**< Enable/disable trace logs in flex- and grid-layout operations. */
     #define LV_LOG_TRACE_ANIM       0   /**< Enable/disable trace logs in animation logic. */
     #define LV_LOG_TRACE_CACHE      0   /**< Enable/disable trace logs in cache operations. */

@@ -12,13 +12,13 @@
 #include "basic_math.h"
 
 #define ENABLE_AUTO_ROTATION 1 // 0 for mouse, 1 for auto
+/* Step 1: Global Resources */
 
 static TransformConfig3D* g_cube = NULL;
 static int16_t last_x = 0;
 static int16_t last_y = 0;
 static bool is_dragging = false;
 
-/* Step 1: Global Resources */
 static lv_obj_t * g_offscreen_root = NULL; // Off-screen root for faces/wrapper
 static lv_obj_t * g_wrapper_obj = NULL;
 static lv_obj_t * g_display_obj = NULL;
@@ -225,7 +225,6 @@ TransformConfig3D* transform_config_3d_create_prism(
     return config;
 }
 
-
 static int apply_transformations_3d()
 {
     if (!g_cube) {
@@ -359,7 +358,7 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         // Manipulation on OFF-SCREEN objects is safe from active screen invalidation logic
         lv_obj_set_parent(face_obj, g_wrapper_obj);
         lv_obj_remove_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_center(face_obj);
+        lv_obj_align(face_obj, LV_ALIGN_TOP_LEFT, 0, 0);
 
         // Dynamic scale calculation to fit 100x100
         int32_t obj_w = lv_obj_get_width(face_obj);
@@ -393,12 +392,13 @@ static void snapshot_draw_event_cb(lv_event_t * e)
             g_cube->vertices_pro[face->vertex_indices[3]],
             g_cube->vertices_pro[face->vertex_indices[0]],
         };
-        int32_t x = lv_obj_get_x(face_obj);
-        int32_t y = lv_obj_get_y(face_obj);
-        int32_t w = lv_obj_get_width(face_obj);
-        int32_t h = lv_obj_get_height(face_obj);
+        // 由于face_obj已经被缩放并居中以填满g_wrapper_obj，
+        // 我们应该使用g_wrapper_obj的尺寸作为纹理源坐标，
+        // 这样可以确保整个snapshot区域被映射到立方体面上。
+        int32_t wrapper_w = lv_obj_get_width(g_wrapper_obj);
+        int32_t wrapper_h = lv_obj_get_height(g_wrapper_obj);
         const Coord2D src_points[4] = {
-            {x,y},{x,y+h},{x+w,y+h},{x+w,y}
+            {0, 0}, {0, wrapper_h}, {wrapper_w, wrapper_h}, {wrapper_w, 0}
         };
 
         lv_matrix_t matrix_struct;
@@ -544,7 +544,7 @@ void demo(void)
         g_cube->faces_obj[i] = obj;
         // lv_obj_remove_style_all(obj);
         lv_obj_set_style_radius(obj, 0, LV_PART_MAIN);
-        lv_obj_set_size(obj, 100, 100);
+        lv_obj_set_size(obj, 200, 200);
         lv_obj_set_style_bg_color(obj, lv_color_make(255*(i&0b1), 255*(i&0b10), 255*(i&0b100)), 0);
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
 
