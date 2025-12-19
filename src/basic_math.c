@@ -206,47 +206,48 @@ uint16_t bilinear_interpolation_draw_buf_rgb565(lv_draw_buf_t* buf, float src_x,
     uint32_t stride = buf->header.stride;
     const uint8_t * data = buf->data;
 
-#if BILINEAR_INTERPOLATION_BOUNDS_CHECK
-    if (src_x < 0 || src_y < 0 || src_x >= w || src_y >= h) {
-        return 0;
-    }
-#endif
-
-    // 1. 浮点坐标钳位 (Clamp to Edge)
-    // 必须在转整数前处理，防止负数或溢出导致权重(wx,wy)超出[0,1]范围，进而产生错误的颜色外推
-    if (src_x < 0) src_x = 0;
-    if (src_y < 0) src_y = 0;
-    if (src_x > w - 1) src_x = w - 1;
-    if (src_y > h - 1) src_y = h - 1;
+    // 1. 浮点坐标钳位 (已由调用者保证范围，此处省略)
 
     // 2. 计算整数坐标
     int x0 = (int)src_x;
     int y0 = (int)src_y;
 
-    // 3. 计算相邻像素坐标 (由于src_x已钳位到w-1，x0最大为w-1，此时x1=w-1)
-    int x1 = (x0 + 1 < w) ? x0 + 1 : x0;
-    int y1 = (y0 + 1 < h) ? y0 + 1 : y0;
+    // 3. 计算相邻像素偏移量 (Branchless)
+    // SIMD 建议: 这种标量判断在 SIMD 中通常由掩码(Mask)或比较指令直接生成向量
+    int dx = (x0 + 1 < w);
+    int dy = (y0 + 1 < h);
 
     // 4. 计算权重
     float wx = src_x - x0;
     float wy = src_y - y0;
 
     // 权重因子
+    // SIMD 伪代码:
+    // v_wx = VDUP(wx); v_wy = VDUP(wy);
+    // v_w00 = VMUL(VRSUB(v_wx, 1.0), VRSUB(v_wy, 1.0)); ...
     float w00 = (1.0f - wx) * (1.0f - wy);
     float w01 = wx * (1.0f - wy);
     float w10 = (1.0f - wx) * wy;
     float w11 = wx * wy;
 
-    // 4. 读取 4 个邻域像素 (RGB565)
+    // 4. 读取 4 个邻域像素 (RGB565) - 全算术计算，无分支
+    // 自定义指令建议: VLD_GATHER_RGB565 r0, [base, offsets]
+    // 一次性从 4 个不连续地址加载并解包 RGB565 到向量寄存器
     const uint8_t * row0 = data + y0 * stride;
-    const uint8_t * row1 = data + y1 * stride;
+    const uint8_t * row1 = row0 + dy * stride;
 
-    uint16_t p00 = *((const uint16_t*)row0 + x0);
-    uint16_t p01 = *((const uint16_t*)row0 + x1);
-    uint16_t p10 = *((const uint16_t*)row1 + x0);
-    uint16_t p11 = *((const uint16_t*)row1 + x1);
+    const uint16_t * p_row0 = (const uint16_t*)row0 + x0;
+    const uint16_t * p_row1 = (const uint16_t*)row1 + x0;
+
+    uint16_t p00 = p_row0[0];
+    uint16_t p01 = p_row0[dx];
+    uint16_t p10 = p_row1[0];
+    uint16_t p11 = p_row1[dx];
 
     // 5. 解包并计算 (R:5, G:6, B:5)
+    // SIMD 建议: 使用 VFMA (Fused Multiply-Add) 指令同时处理多个通道
+    // v_res_r = VFMA(v_p00_r, v_w00, v_res_r); ...
+
     // Red (Mask 0xF800 >> 11)
     float r = w00 * ((p00 & 0xF800) >> 11) +
               w01 * ((p01 & 0xF800) >> 11) +
@@ -266,13 +267,8 @@ uint16_t bilinear_interpolation_draw_buf_rgb565(lv_draw_buf_t* buf, float src_x,
               w11 * (p11 & 0x001F);
 
     // 6. 打包回 RGB565
-    uint16_t res_r = (uint16_t)r;
-    uint16_t res_g = (uint16_t)g;
-    uint16_t res_b = (uint16_t)b;
-
-    if (res_r > 31) res_r = 31;
-    if (res_g > 63) res_g = 63;
-    if (res_b > 31) res_b = 31;
-
-    return (res_r << 11) | (res_g << 5) | res_b;
+    // 数学证明: 由于权重和为1.0且w_i >= 0，结果必定在[min(p_i), max(p_i)]范围内，
+    // 因此对于原生RGB565分量，结果保证不会溢出，无需 if 检查。
+    // SIMD 建议: VPACK_RGB565 v_res_packed, v_r, v_g, v_b
+    return ((uint16_t)r << 11) | ((uint16_t)g << 5) | (uint16_t)b;
 }

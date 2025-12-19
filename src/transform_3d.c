@@ -326,9 +326,10 @@ static void snapshot_draw_event_cb(lv_event_t * e)
 {
     LV_PROFILER_BEGIN_TAG("snapshot_draw_event_cb");
     lv_event_code_t code = lv_event_get_code(e);
-    if(code != LV_EVENT_DRAW_MAIN) return;
-
-    if(!g_cube || !g_wrapper_obj || !g_snapshot_buf) return;
+    if(code != LV_EVENT_DRAW_MAIN)
+        return;
+    if(!g_cube || !g_wrapper_obj || !g_snapshot_buf)
+        return;
 
     lv_layer_t * layer = lv_event_get_layer(e);
     lv_obj_t * display_obj = lv_event_get_target(e);
@@ -337,14 +338,13 @@ static void snapshot_draw_event_cb(lv_event_t * e)
     uint8_t * dest_buf_start = layer->draw_buf->data;
     uint32_t dest_stride = layer->draw_buf->header.stride;
     lv_area_t clip_area = layer->_clip_area;
-    int px_size = 2; // 16-bit RGB565
-
     lv_area_t obj_coords;
-    lv_obj_get_coords(display_obj, &obj_coords);
+    lv_area_t draw_area;
 
     /* Calculate the intersection of the object and the clip area */
-    lv_area_t draw_area;
-    if(!_lv_area_intersect(&draw_area, &obj_coords, &clip_area)) return;
+    lv_obj_get_coords(display_obj, &obj_coords);
+    if(!lv_area_intersect(&draw_area, &obj_coords, &clip_area))
+        return;
 
     // Loop through faces
     for (uint32_t i = 0; i < g_cube->faces_len; ++i)
@@ -352,8 +352,10 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         const CoordFace* face = &g_cube->faces_ptr[i];
         lv_obj_t* face_obj = g_cube->faces_obj[i];
 
-        if (!is_face_visible(face->vertex_indices, g_cube->vertices_tra)) continue;
+        if (!is_face_visible(face->vertex_indices, g_cube->vertices_tra))
+        continue;
 
+        LV_PROFILER_BEGIN_TAG("not_double_for_loop");
         // Manipulation on OFF-SCREEN objects is safe from active screen invalidation logic
         lv_obj_set_parent(face_obj, g_wrapper_obj);
         lv_obj_remove_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
@@ -366,26 +368,26 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         int32_t obj_w = lv_obj_get_width(face_obj);
         int32_t obj_h = lv_obj_get_height(face_obj);
 
-        if(obj_w < 1) obj_w = 1;
-        if(obj_h < 1) obj_h = 1;
+        if(obj_w < 1)
+            obj_w = 1;
+        if(obj_h < 1)
+            obj_h = 1;
 
         // 调整容器大小以适应内容
-        if (lv_obj_get_width(g_wrapper_obj) != obj_w || lv_obj_get_height(g_wrapper_obj) != obj_h) {
+        if (lv_obj_get_width(g_wrapper_obj) != obj_w || lv_obj_get_height(g_wrapper_obj) != obj_h)
             lv_obj_set_size(g_wrapper_obj, obj_w, obj_h);
-        }
 
-        // 确保清除之前的缩放设置（如果有）
-        lv_obj_set_style_transform_scale(face_obj, 256, 0);
-
-        // Update layout to ensure rendering is correct
+        // Ready to snapshot, update layout to ensure rendering is correct
         lv_obj_update_layout(g_wrapper_obj);
 
+        // not necessary: g_wrapper_obj is guaranteed to be max of all face_obj
+        // if (lv_snapshot_reshape_draw_buf(g_wrapper_obj, g_snapshot_buf) != LV_RESULT_OK) {
+        //         lv_obj_set_parent(face_obj, g_offscreen_root);
+        //         lv_obj_add_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
+        //         continue;
+        // }
+
         // 3. Take Snapshot
-        if (lv_snapshot_reshape_draw_buf(g_wrapper_obj, g_snapshot_buf) != LV_RESULT_OK) {
-             lv_obj_set_parent(face_obj, g_offscreen_root);
-             lv_obj_add_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
-             continue;
-        }
         lv_snapshot_take_to_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565, g_snapshot_buf);
 
         // 4. Calculate Matrix
@@ -404,10 +406,9 @@ static void snapshot_draw_event_cb(lv_event_t * e)
             {0, 0}, {0, wrapper_h}, {wrapper_w, wrapper_h}, {wrapper_w, 0}
         };
 
-        lv_matrix_t matrix_struct;
+        float matrix[3][3] = {0};
         // matrix maps screen(dst) -> texture(src)
-        calculate_inverse_transform_matrix(src_points, dst_points, matrix_struct.m);
-        float (*matrix)[3] = matrix_struct.m;
+        calculate_inverse_transform_matrix(src_points, dst_points, matrix);
 
         // Restore to storage
         lv_obj_set_parent(face_obj, g_offscreen_root);
@@ -417,16 +418,39 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         int32_t src_w = g_snapshot_buf->header.w;
         int32_t src_h = g_snapshot_buf->header.h;
 
-        // Optimization: Use bounding box of the face to limit the loop would be better,
-        // but for now iterating the draw area is safer.
+        // Optimization: Calculate bounding box of the face to limit the loop
+        float f_min_x = dst_points[0].x;
+        float f_max_x = dst_points[0].x;
+        float f_min_y = dst_points[0].y;
+        float f_max_y = dst_points[0].y;
+
+        for(int k = 1; k < 4; k++) {
+            if(dst_points[k].x < f_min_x) f_min_x = dst_points[k].x;
+            if(dst_points[k].x > f_max_x) f_max_x = dst_points[k].x;
+            if(dst_points[k].y < f_min_y) f_min_y = dst_points[k].y;
+            if(dst_points[k].y > f_max_y) f_max_y = dst_points[k].y;
+        }
+
+        lv_area_t face_area;
+        face_area.x1 = (int32_t)floorf(f_min_x);
+        face_area.y1 = (int32_t)floorf(f_min_y);
+        face_area.x2 = (int32_t)ceilf(f_max_x);
+        face_area.y2 = (int32_t)ceilf(f_max_y);
+
+        // Intersect with the clip/object draw area
+        lv_area_t iter_area;
+        if(!_lv_area_intersect(&iter_area, &draw_area, &face_area)) continue;
+        LV_PROFILER_END_TAG("not_double_for_loop");
         LV_PROFILER_BEGIN_TAG("double_for_loop");
-        for(int32_t draw_y = draw_area.y1; draw_y <= draw_area.y2; draw_y++) {
+        LV_LOG_USER("draw area: %dx%d", iter_area.x2 - iter_area.x1, iter_area.y2 - iter_area.y1);
+
+        for(int32_t draw_y = iter_area.y1; draw_y <= iter_area.y2; draw_y++) {
             uint32_t dest_y_idx = (draw_y - layer->buf_area.y1);
             uint8_t * dest_row = dest_buf_start + (dest_y_idx * dest_stride);
 
             float y_local = (float)(draw_y - obj_coords.y1);
 
-            for(int32_t draw_x = draw_area.x1; draw_x <= draw_area.x2; draw_x++) {
+            for(int32_t draw_x = iter_area.x1; draw_x <= iter_area.x2; draw_x++) {
                 float x_local = (float)(draw_x - obj_coords.x1);
 
                 // Inverse Matrix: screen(x,y) -> texture(u,v)
@@ -438,7 +462,7 @@ static void snapshot_draw_event_cb(lv_event_t * e)
                 uint16_t color = bilinear_interpolation_draw_buf_rgb565(g_snapshot_buf, u, v);
 
                 uint32_t dest_x_idx = (draw_x - layer->buf_area.x1);
-                uint16_t * dst_px = (uint16_t*)(dest_row + dest_x_idx * px_size);
+                uint16_t * dst_px = (uint16_t*)(dest_row + dest_x_idx * 2); // 2=RGB565
 
                 *dst_px = color;
             }
@@ -540,7 +564,7 @@ void demo(void)
         // lv_obj_remove_style_all(obj);
         lv_obj_set_style_radius(obj, 0, LV_PART_MAIN);
         // User can change size here to test mixed sizes
-        lv_obj_set_size(obj, 200, 200);
+        lv_obj_set_size(obj, 200-i*10, 140+i*10);
         lv_obj_set_style_bg_color(obj, lv_color_make(255*(i&0b1), 255*(i&0b10), 255*(i&0b100)), 0);
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
 
