@@ -18,6 +18,11 @@ try:
 except ImportError:
     raise ImportError("Need lz4 package, do `pip3 install lz4`")
 
+try:
+    from PIL import Image
+except ImportError:
+    raise ImportError("Need PIL package, do `pip3 install Pillow`")
+
 
 def uint8_t(val) -> bytes:
     return val.to_bytes(1, byteorder='little')
@@ -879,7 +884,7 @@ class LVGLImage:
         Create lvgl image from png file.
         If cf is none, used I1/2/4/8 based on palette size
         """
-
+        print("from_png")
         self.background = background
         self.rgb565_dither = rgb565_dither
         self.nema_gfx = nema_gfx
@@ -905,6 +910,141 @@ class LVGLImage:
             logging.warning(f"missing logic: {cf.name}")
 
         logging.info(f"from png: {filename}, cf: {self.cf.name}")
+        return self
+
+    def from_bmp(self, filename: str, cf: ColorFormat = None, background: int = 0x00_00_00):
+        print("from_bmp")
+        with Image.open(filename) as img:
+            img = img.convert("RGBA")
+            w, h = img.size
+            data = list(img.getdata())
+
+        # Convert [(R, G, B, A), ...] to separate lists like png.Reader.asRGBA8()
+        # Flat list: R, G, B, A, R, G, B, A...
+        raw_flat_data = []
+        for r, g, b, a in data:
+            raw_flat_data.extend([r, g, b, a])
+
+        # Create rows similar to what png reader returns
+        rows = [raw_flat_data[i * w * 4:(i + 1) * w * 4] for i in range(h)]
+
+        # Reuse existing png conversion logic by adapting the data
+        # We need to create a temporary dummy file structure or adapt logic to accept data directly
+        # But since _png_to_... methods read from filename or rely on png reader structure,
+        # we might need to refactor or mock.
+        # Actually, simpler way: Reuse the set_data and specific conversion logic
+        # OR: Save as temporary PNG and use from_png (easiest but slower)
+        # Better: Refactor _png_to_colormap to accept raw RGBA data.
+
+        # Let's try to adapt logic from _png_to_colormap without rewriting everything.
+        # _png_to_colormap uses png.Reader(str(filename)).asRGBA8()
+
+        self.background = background
+
+        if cf is None:
+             # split filename string and match with ColorFormat to check
+            # which cf to use
+            names = str(path.basename(filename)).split(".")
+            for c in names[1:-1]:
+                if c in ColorFormat.__members__:
+                    cf = ColorFormat[c]
+                    break
+
+        if cf is None:
+             cf = ColorFormat.I8 # Default to I8 if unknown, or maybe ARGB8888? Let's use ARGB8888 for BMP usually
+
+        self.cf = cf
+
+        if cf.is_indexed:
+            # For indexed, it's complex because we need quantization.
+            # PIL supports quantization:
+             with Image.open(filename) as img:
+                img_p = img.quantize(colors=cf.ncolors)
+                palette = img_p.getpalette() # [r,g,b, r,g,b...]
+                # Pad palette if needed
+                if len(palette) < cf.ncolors * 3:
+                     palette.extend([0] * (cf.ncolors * 3 - len(palette)))
+
+                # Convert palette to LVGL format
+                raw_palette = bytearray()
+                # PIL palette is RGB, we need ARGB (or whatever LVGL expects in _png_to_indexed)
+                # _png_to_indexed expects [(R,G,B,A)...] from png reader
+
+                # Let's stick to true color formats for now as BMP usually is used for that,
+                # or use temporary PNG for full compatibility
+                pass
+
+        # To avoid massive refactoring, we can just treat the data we got from PIL
+        # and feed it into the same logic.
+        # But _png_to_colormap reads file again.
+        # So we should probably just refactor _png_to_colormap to take rows/w/h
+
+        # For now, let's implement a direct RGBA -> Target CF conversion for BMP here
+
+        rawdata = bytearray()
+
+        if cf == ColorFormat.ARGB8888:
+            def pack(r, g, b, a):
+                return uint32_t((a << 24) | (r << 16) | (g << 8) | (b << 0))
+        elif cf == ColorFormat.RGB565:
+             def pack(r, g, b, a):
+                r, g, b, a = color_pre_multiply(r, g, b, a, self.background)
+                color = (r >> 3) << 11
+                color |= (g >> 2) << 5
+                color |= (b >> 3) << 0
+                return uint16_t(color)
+        elif cf == ColorFormat.RGB888:
+             def pack(r, g, b, a):
+                r, g, b, a = color_pre_multiply(r, g, b, a, self.background)
+                return uint24_t((r << 16) | (g << 8) | (b << 0))
+        elif cf == ColorFormat.RGB565A8:
+             def pack(r, g, b, a):
+                color = (r >> 3) << 11
+                color |= (g >> 2) << 5
+                color |= (b >> 3) << 0
+                return uint16_t(color)
+        # ... add others as needed from _png_to_colormap ...
+        else:
+             # Fallback to PNG conversion for complex formats if available
+             # or raise error
+             pass
+
+        # Re-implementing the loop from _png_to_colormap
+        if 'pack' in locals():
+            alpha = bytearray()
+            for y, row in enumerate(rows):
+                R = row[0::4]
+                G = row[1::4]
+                B = row[2::4]
+                A = row[3::4]
+                for x, (r, g, b, a) in enumerate(zip(R, G, B, A)):
+                    if cf == ColorFormat.RGB565A8:
+                        alpha += uint8_t(a)
+
+                    # Dithering logic could be added here if needed
+
+                    rawdata += pack(r, g, b, a)
+
+            if cf == ColorFormat.RGB565A8:
+                rawdata += alpha
+
+            self.set_data(cf, w, h, rawdata)
+            logging.info(f"from bmp: {filename}, cf: {self.cf.name}")
+            return self
+
+        # If we didn't handle it above (e.g. Indexed), try via temporary PNG
+        # This is a safe fallback
+        import tempfile
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            Image.open(filename).save(tmp.name)
+            tmp_name = tmp.name
+
+        try:
+            self.from_png(tmp_name, cf, background, self.rgb565_dither, self.nema_gfx)
+            logging.info(f"from bmp (via png): {filename}, cf: {self.cf.name}")
+        finally:
+            os.remove(tmp_name)
+
         return self
 
     def _png_to_indexed(self, cf: ColorFormat, filename: str):
@@ -1357,6 +1497,22 @@ class PNGConverter:
                 # Process RAW image explicitly
                 img = RAWImage().from_file(f, self.cf)
                 img.to_c_array(self._replace_ext(f, ".c", outputname), outputname=outputname)
+            elif f.lower().endswith(".bmp"):
+                img = LVGLImage().from_bmp(f, self.cf, background=self.background)
+                img.adjust_stride(align=self.align)
+
+                if self.premultiply:
+                    img.premultiply()
+                output.append((f, img))
+                if self.ofmt == OutputFormat.BIN_FILE:
+                    img.to_bin(self._replace_ext(f, ".bin"),
+                               compress=self.compress)
+                elif self.ofmt == OutputFormat.C_ARRAY:
+                    img.to_c_array(self._replace_ext(f, ".c", outputname),
+                                   compress=self.compress,
+                                   outputname=outputname)
+                elif self.ofmt == OutputFormat.PNG_FILE:
+                    img.to_png(self._replace_ext(f, ".png"))
             else:
                 img = LVGLImage().from_png(f, self.cf, background=self.background, rgb565_dither=self.rgb565_dither, nema_gfx=self.nema_gfx)
                 img.adjust_stride(align=self.align)
@@ -1436,6 +1592,7 @@ def main():
         files = [args.input]
     elif path.isdir(args.input):
         files = list(Path(args.input).rglob("*.[pP][nN][gG]"))
+        files.extend(list(Path(args.input).rglob("*.[bB][mM][pP]")))
 
         if args.name is not None:
             raise BaseException(f"invalid input: cannot specify --name when input is a directory")

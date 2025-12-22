@@ -35,6 +35,8 @@
 #include "demo_direct_draw.h"
 #include "demo_snapshot_verification.h"
 
+#include "../lvgl/output/HRS_png_I8_LZ4.c"
+
 /*********************
  *      DEFINES
  *********************/
@@ -47,7 +49,7 @@
  *  STATIC PROTOTYPES
  **********************/
 static void log_to_file_cb(lv_log_level_t level, const char * buf);
-
+void lv_example_get_localpic(void);
 /**********************
  *  STATIC VARIABLES
  **********************/
@@ -63,20 +65,9 @@ static void log_to_file_cb(lv_log_level_t level, const char * buf);
 
 void very_simple_demo(void)
 {
-    // lv_obj_t * obj1 = lv_image_create(lv_screen_active());
-    // lv_image_set_src(obj1, &lena_240);
-
-    lv_obj_t * obj1 = lv_obj_create(lv_screen_active());
-    lv_obj_set_size(obj1, 200, 200);
-
-    lv_obj_center(obj1);
-
-    // lv_matrix_t matrix;
-    // lv_matrix_identity(&matrix);
-    // lv_matrix_rotate(&matrix, 40);
-    // matrix.m[0][2] = 50; // x 平移
-    // matrix.m[1][2] = 20;  // y 平移
-    // lv_obj_set_transform(obj1, &matrix);
+    lv_obj_t * bg = lv_image_create(lv_screen_active());
+    lv_image_set_src(bg, &HRS_png_I8_LZ4);
+    lv_obj_set_pos(bg, 0, 0);
 }
 
 FILE *prof_log;
@@ -154,8 +145,9 @@ int main(int argc, char **argv)
     // lv_demo_widgets();
     // lv_demo_benchmark();
     my_profiler_init();
-    demo();
-    // very_simple_demo();
+    // demo();
+    very_simple_demo();
+    // lv_example_get_localpic();
     // lv_example_canvas_1();
     // lv_example_obj_3();
     // lv_demo_direct_draw();
