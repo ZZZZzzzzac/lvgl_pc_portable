@@ -212,27 +212,11 @@ uint16_t bilinear_interpolation_draw_buf_rgb565(lv_draw_buf_t* buf, float src_x,
     int x0 = (int)src_x;
     int y0 = (int)src_y;
 
-    // 3. 计算相邻像素偏移量 (Branchless)
-    // SIMD 建议: 这种标量判断在 SIMD 中通常由掩码(Mask)或比较指令直接生成向量
+    // 3. 读取 4 个邻域像素 (RGB565) - 全算术计算，无分支
+#if 0
     int dx = (x0 + 1 < w);
     int dy = (y0 + 1 < h);
 
-    // 4. 计算权重
-    float wx = src_x - x0;
-    float wy = src_y - y0;
-
-    // 权重因子
-    // SIMD 伪代码:
-    // v_wx = VDUP(wx); v_wy = VDUP(wy);
-    // v_w00 = VMUL(VRSUB(v_wx, 1.0), VRSUB(v_wy, 1.0)); ...
-    float w00 = (1.0f - wx) * (1.0f - wy);
-    float w01 = wx * (1.0f - wy);
-    float w10 = (1.0f - wx) * wy;
-    float w11 = wx * wy;
-
-    // 4. 读取 4 个邻域像素 (RGB565) - 全算术计算，无分支
-    // 自定义指令建议: VLD_GATHER_RGB565 r0, [base, offsets]
-    // 一次性从 4 个不连续地址加载并解包 RGB565 到向量寄存器
     const uint8_t * row0 = data + y0 * stride;
     const uint8_t * row1 = row0 + dy * stride;
 
@@ -243,10 +227,38 @@ uint16_t bilinear_interpolation_draw_buf_rgb565(lv_draw_buf_t* buf, float src_x,
     uint16_t p01 = p_row0[dx];
     uint16_t p10 = p_row1[0];
     uint16_t p11 = p_row1[dx];
+#else
+    int x1 = (x0 + 1 < w) ? x0 + 1 : x0;
+    int y1 = (y0 + 1 < h) ? y0 + 1 : y0;
+
+    const uint8_t * row0 = data + y0 * stride;
+    const uint8_t * row1 = data + y1 * stride;
+
+    uint16_t p00 = *((const uint16_t*)row0 + x0);
+    uint16_t p01 = *((const uint16_t*)row0 + x1);
+    uint16_t p10 = *((const uint16_t*)row1 + x0);
+    uint16_t p11 = *((const uint16_t*)row1 + x1);
+#endif
+
+    // 4. 权重因子
+    float wx = src_x - x0;
+    float wy = src_y - y0;
+
+    float w00 = (1.0f - wx) * (1.0f - wy);
+    float w01 =         wx  * (1.0f - wy);
+    float w10 = (1.0f - wx) *         wy ;
+    float w11 =         wx  *         wy ;
 
     // 5. 解包并计算 (R:5, G:6, B:5)
-    // SIMD 建议: 使用 VFMA (Fused Multiply-Add) 指令同时处理多个通道
-    // v_res_r = VFMA(v_p00_r, v_w00, v_res_r); ...
+    // SIMD 直接在uint16 RGB565时间上进行加权操作
+    // rgb565 = {p00[0:15], p01[0:15], p10[0:15], p11[0:15]};
+    // r5 = {p00[11:15], p01[11:15], p10[11:15], p11[11:15]};
+    // g6 = {p00[5:10], p01[5:10], p10[5:10], p11[5:10]};
+    // b5 = {p00[0:4], p01[0:4], p10[0:4], p11[0:4]};
+    // r5 = w00 * r5[0] + w01 * r5[1] + w10 * r5[2] + w11 * r5[3];
+    // g6 = w00 * g6[0] + w01 * g6[1] + w10 * g6[2] + w11 * g6[3];
+    // b5 = w00 * b5[0] + w01 * b5[1] + w10 * b5[2] + w11 * b5[3];
+    // rgb565 = (r5 << 11) | (g6 << 5) | b5;
 
     // Red (Mask 0xF800 >> 11)
     float r = w00 * ((p00 & 0xF800) >> 11) +

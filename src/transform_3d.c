@@ -373,7 +373,7 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         if(obj_h < 1)
             obj_h = 1;
 
-        // 调整容器大小以适应内容
+        // 调整容器大小以适应内容，由于一开始建立g_wrapper_obj的时候遍历了face_obj的最大尺寸，这里调整后不会出现g_snapshot_buf不够的问题。
         if (lv_obj_get_width(g_wrapper_obj) != obj_w || lv_obj_get_height(g_wrapper_obj) != obj_h)
             lv_obj_set_size(g_wrapper_obj, obj_w, obj_h);
 
@@ -439,7 +439,8 @@ static void snapshot_draw_event_cb(lv_event_t * e)
 
         // Intersect with the clip/object draw area
         lv_area_t iter_area;
-        if(!_lv_area_intersect(&iter_area, &draw_area, &face_area)) continue;
+        if(!_lv_area_intersect(&iter_area, &draw_area, &face_area))
+            continue;
         LV_PROFILER_END_TAG("not_double_for_loop");
         LV_PROFILER_BEGIN_TAG("double_for_loop");
         LV_LOG_USER("draw area: %dx%d", iter_area.x2 - iter_area.x1, iter_area.y2 - iter_area.y1);
@@ -457,7 +458,8 @@ static void snapshot_draw_event_cb(lv_event_t * e)
                 float u = matrix[0][0] * x_local + matrix[0][1] * y_local + matrix[0][2];
                 float v = matrix[1][0] * x_local + matrix[1][1] * y_local + matrix[1][2];
 
-                if(u < 0 || u >= src_w || v < 0 || v >= src_h) continue;
+                if(u < 0 || u >= src_w || v < 0 || v >= src_h)
+                    continue;
 
                 uint16_t color = bilinear_interpolation_draw_buf_rgb565(g_snapshot_buf, u, v);
 

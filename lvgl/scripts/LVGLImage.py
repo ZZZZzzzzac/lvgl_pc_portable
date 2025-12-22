@@ -276,7 +276,7 @@ def unpack_colors(data: bytes, cf: ColorFormat, w) -> List:
                 ret.append(bit_extend((p >> 11) & 0x1f, 5))  # R
                 ret.append(bit_extend((p >> 5) & 0x3f, 6))  # G
                 ret.append(bit_extend((p >> 0) & 0x1f, 5))  # B
-        
+
     elif bpp == 24:
         if cf == ColorFormat.RGB888:
             B = data[0::3]
