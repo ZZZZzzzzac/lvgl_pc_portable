@@ -29,7 +29,7 @@ void lv_example_get_started_1(void);
 void lv_example_get_started_2(void);
 void lv_example_get_started_3(void);
 void lv_example_get_started_4(void);
-
+void lv_example_get_localpic(void);
 /**********************
  *      MACROS
  **********************/
