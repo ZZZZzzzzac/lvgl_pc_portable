@@ -543,7 +543,7 @@ void demo(void)
         // lv_obj_remove_style_all(obj);
         lv_obj_set_style_radius(obj, 0, LV_PART_MAIN);
         // User can change size here to test mixed sizes
-        lv_obj_set_size(obj, 200-i*10, 140+i*10);
+        lv_obj_set_size(obj, FACE_SNAPSHOT_SIZE, FACE_SNAPSHOT_SIZE); // 缩小版的各个页面
         lv_obj_set_style_bg_color(obj, lv_color_make(255*(i&0b1), 255*(i&0b10), 255*(i&0b100)), 0);
         lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
 
@@ -553,12 +553,12 @@ void demo(void)
         lv_obj_center(label);
 
         lv_obj_t * sub_obj1 = lv_obj_create(obj);
-        lv_obj_set_size(sub_obj1, 40, 40);
+        lv_obj_set_size(sub_obj1, 20, 20);
         lv_obj_set_style_bg_color(sub_obj1, lv_color_make(255, 0, 255), 0);
         lv_obj_align(sub_obj1, LV_ALIGN_TOP_LEFT, 5, 5);
 
         lv_obj_t * btn = lv_button_create(obj);
-        lv_obj_set_size(btn, 80, 40);
+        lv_obj_set_size(btn, 40, 20);
         lv_obj_align(btn, LV_ALIGN_BOTTOM_MID, 0, -10);
         lv_obj_t * btn_lbl = lv_label_create(btn);
         lv_label_set_text(btn_lbl, "Click Me");

@@ -1,61 +1,64 @@
 功能优先级：
-1:
-    vadd/sub
-    vmul/vmla
-    vshr/vshl
-    vld/vst
-    vmov/vdup
-    vset/vget
-    整数浮点转化
-2:
-    vrgb565
-    vneg
-    vand/orr/xor
-3:
-    vceq/cgt/cge
-    vcombine
-4:
-    vrev
-    vtrn
-    vzip
-支持优先级：
-1：
-    s/u+8/16/32
-    l（扩展）
-2:
-    s/u64
-    f32
-    q（饱和）
-3:
-    f64
+    1:
+        fft（32位，256）
+        vadd/sub
+        vmul/vmla
+        vshr/vshl
+        vld/vst
+        vmov/vdup
+        vset/vget
+        整数浮点转化(C类型转换，但一次多个)
+    2:
+        vrgb565
+        vneg
+        vand/orr/xor
+    3:
+        vceq/cgt/cge
+        vcombine
+    4:
+        vrev
+        vtrn
+        vzip
 
-AI：
-    整数浮点转化
-2.5D：
-    vrgb565_add/mul
-SBC：(processMatrixing4\8, calcAudioSamples4\8)
-    vld/vst
-    vmla（a += b * c）
-    vmul
-    vshr
-MP3:
-    vst1q_f32
-    vld1q_f32
-    vmovq_n_f32
-    vaddq_f32
-    vsubq_f32
-    vmulq_f32
-    vcombine_f32
-    vget_high_f32
-    vrev64q_f32
-    vget_low_f32
-FLAC:
-    vdupq_n_f64
-    vextq_f64
-    vfmaq_f64
-    vst1q_f64
-OPUS:
-    许多
+支持优先级：
+    1：
+        s/u+8/16/32
+        l（扩展）
+    2:
+        s/u64
+        f32
+        q（饱和）
+    3:
+        f64
+
+各应用使用neon指令：
+    AI：
+        整数浮点转化
+    2.5D：
+        vrgb565_add/mul
+    SBC：(processMatrixing4\8, calcAudioSamples4\8)
+        vld/vst
+        vmla（a += b * c）
+        vmul
+        vshr
+    MP3:
+        vst1q_f32
+        vld1q_f32
+        vmovq_n_f32
+        vaddq_f32
+        vsubq_f32
+        vmulq_f32
+        vcombine_f32
+        vget_high_f32
+        vrev64q_f32
+        vget_low_f32
+    FLAC:
+        vdupq_n_f64
+        vextq_f64
+        vfmaq_f64
+        vst1q_f64
+    OPUS:
+        许多
 
 
 
