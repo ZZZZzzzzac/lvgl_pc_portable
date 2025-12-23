@@ -19,10 +19,12 @@ static int16_t last_x = 0;
 static int16_t last_y = 0;
 static bool is_dragging = false;
 
+#define FACE_SNAPSHOT_SIZE 100
+
 static lv_obj_t * g_offscreen_root = NULL; // Off-screen root for faces/wrapper
 static lv_obj_t * g_wrapper_obj = NULL;
 static lv_obj_t * g_display_obj = NULL;
-static lv_draw_buf_t * g_snapshot_buf = NULL;
+static lv_draw_buf_t * g_snapshot_bufs[6] = {0};
 
 static TransformConfig3D* transform_config_3d_create(
     uint32_t canvas_width, uint32_t canvas_height)
@@ -328,7 +330,7 @@ static void snapshot_draw_event_cb(lv_event_t * e)
     lv_event_code_t code = lv_event_get_code(e);
     if(code != LV_EVENT_DRAW_MAIN)
         return;
-    if(!g_cube || !g_wrapper_obj || !g_snapshot_buf)
+    if(!g_cube || !g_wrapper_obj || !g_snapshot_bufs[0])
         return;
 
     lv_layer_t * layer = lv_event_get_layer(e);
@@ -350,47 +352,14 @@ static void snapshot_draw_event_cb(lv_event_t * e)
     for (uint32_t i = 0; i < g_cube->faces_len; ++i)
     {
         const CoordFace* face = &g_cube->faces_ptr[i];
-        lv_obj_t* face_obj = g_cube->faces_obj[i];
 
         if (!is_face_visible(face->vertex_indices, g_cube->vertices_tra))
-        continue;
+            continue;
 
-        LV_PROFILER_BEGIN_TAG("TAG1");
-        // Manipulation on OFF-SCREEN objects is safe from active screen invalidation logic
-        lv_obj_set_parent(face_obj, g_wrapper_obj);
-        lv_obj_remove_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_align(face_obj, LV_ALIGN_TOP_LEFT, 0, 0);
-        LV_PROFILER_END_TAG("TAG1");
-        LV_PROFILER_BEGIN_TAG("TAG2");
-        // 性能优化：不再缩放face_obj。
-        // 使用transform_scale会导致LVGL在渲染时申请巨大的临时图层缓冲(ARGB8888)，造成内存尖峰和抖动。
-        // 改为调整wrapper大小以匹配face_obj的原始尺寸，进行1:1快照。
-        // 最终的缩放由3D纹理映射的双线性插值自动处理。
-        int32_t obj_w = lv_obj_get_width(face_obj);
-        int32_t obj_h = lv_obj_get_height(face_obj);
+        lv_draw_buf_t * snapshot_buf = g_snapshot_bufs[i];
+        if(!snapshot_buf)
+            continue;
 
-        if(obj_w < 1)
-            obj_w = 1;
-        if(obj_h < 1)
-            obj_h = 1;
-
-        // 调整容器大小以适应内容，由于一开始建立g_wrapper_obj的时候遍历了face_obj的最大尺寸，这里调整后不会出现g_snapshot_buf不够的问题。
-        if (lv_obj_get_width(g_wrapper_obj) != obj_w || lv_obj_get_height(g_wrapper_obj) != obj_h)
-            lv_obj_set_size(g_wrapper_obj, obj_w, obj_h);
-
-        // Ready to snapshot, update layout to ensure rendering is correct
-        lv_obj_update_layout(g_wrapper_obj);
-        LV_PROFILER_END_TAG("TAG2");
-        LV_PROFILER_BEGIN_TAG("TAG3");
-        // not necessary: g_wrapper_obj is guaranteed to be max of all face_obj
-        // if (lv_snapshot_reshape_draw_buf(g_wrapper_obj, g_snapshot_buf) != LV_RESULT_OK) {
-        //         lv_obj_set_parent(face_obj, g_offscreen_root);
-        //         lv_obj_add_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
-        //         continue;
-        // }
-        // 3. Take Snapshot
-        lv_snapshot_take_to_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565, g_snapshot_buf);
-        LV_PROFILER_END_TAG("TAG3");
         LV_PROFILER_BEGIN_TAG("TAG4");
         // 4. Calculate Matrix
         const Coord2D dst_points[4] = {
@@ -399,13 +368,10 @@ static void snapshot_draw_event_cb(lv_event_t * e)
             g_cube->vertices_pro[face->vertex_indices[3]],
             g_cube->vertices_pro[face->vertex_indices[0]],
         };
-        // 由于face_obj已经被缩放并居中以填满g_wrapper_obj，
-        // 我们应该使用g_wrapper_obj的尺寸作为纹理源坐标，
-        // 这样可以确保整个snapshot区域被映射到立方体面上。
-        int32_t wrapper_w = lv_obj_get_width(g_wrapper_obj);
-        int32_t wrapper_h = lv_obj_get_height(g_wrapper_obj);
+
+        // 100x100 fixed size
         const Coord2D src_points[4] = {
-            {0, 0}, {0, wrapper_h}, {wrapper_w, wrapper_h}, {wrapper_w, 0}
+            {0, 0}, {0, FACE_SNAPSHOT_SIZE}, {FACE_SNAPSHOT_SIZE, FACE_SNAPSHOT_SIZE}, {FACE_SNAPSHOT_SIZE, 0}
         };
         LV_PROFILER_END_TAG("TAG4");
         LV_PROFILER_BEGIN_TAG("TAG5");
@@ -413,15 +379,11 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         // matrix maps screen(dst) -> texture(src)
         calculate_inverse_transform_matrix(src_points, dst_points, matrix);
         LV_PROFILER_END_TAG("TAG5");
-        LV_PROFILER_BEGIN_TAG("TAG6");
-        // Restore to storage
-        lv_obj_set_parent(face_obj, g_offscreen_root);
-        lv_obj_add_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
-        LV_PROFILER_END_TAG("TAG6");
+
         LV_PROFILER_BEGIN_TAG("TAG7");
         // 6. Draw the face
-        int32_t src_w = g_snapshot_buf->header.w;
-        int32_t src_h = g_snapshot_buf->header.h;
+        int32_t src_w = snapshot_buf->header.w;
+        int32_t src_h = snapshot_buf->header.h;
 
         // Optimization: Calculate bounding box of the face to limit the loop
         float f_min_x = dst_points[0].x;
@@ -449,7 +411,7 @@ static void snapshot_draw_event_cb(lv_event_t * e)
             continue;
 
         LV_PROFILER_BEGIN_TAG("double_for_loop");
-        LV_LOG_USER("draw area: %dx%d", iter_area.x2 - iter_area.x1, iter_area.y2 - iter_area.y1);
+        // LV_LOG_USER("draw area: %dx%d", iter_area.x2 - iter_area.x1, iter_area.y2 - iter_area.y1);
 
         for(int32_t draw_y = iter_area.y1; draw_y <= iter_area.y2; draw_y++) {
             uint32_t dest_y_idx = (draw_y - layer->buf_area.y1);
@@ -467,7 +429,7 @@ static void snapshot_draw_event_cb(lv_event_t * e)
                 if(u < 0 || u >= src_w || v < 0 || v >= src_h)
                     continue;
 
-                uint16_t color = bilinear_interpolation_draw_buf_rgb565(g_snapshot_buf, u, v);
+                uint16_t color = bilinear_interpolation_draw_buf_rgb565(snapshot_buf, u, v);
 
                 uint32_t dest_x_idx = (draw_x - layer->buf_area.x1);
                 uint16_t * dst_px = (uint16_t*)(dest_row + dest_x_idx * 2); // 2=RGB565
@@ -564,6 +526,15 @@ void demo(void)
     // Register draw callback
     lv_obj_add_event_cb(g_display_obj, snapshot_draw_event_cb, LV_EVENT_DRAW_MAIN, NULL);
 
+    g_wrapper_obj = lv_obj_create(g_offscreen_root);
+    lv_obj_remove_style_all(g_wrapper_obj);
+    lv_obj_set_size(g_wrapper_obj, FACE_SNAPSHOT_SIZE, FACE_SNAPSHOT_SIZE);
+    lv_obj_align(g_wrapper_obj, LV_ALIGN_TOP_LEFT, 0, 0);
+    // Make it opaque to optimize memory/perf
+    lv_obj_set_style_bg_opa(g_wrapper_obj, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(g_wrapper_obj, lv_color_black(), 0);
+    lv_obj_remove_flag(g_wrapper_obj, LV_OBJ_FLAG_HIDDEN);
+
     // Create faces on OFF-SCREEN root
     for (int i = 0; i < 6; i++)
     {
@@ -594,32 +565,30 @@ void demo(void)
         lv_obj_center(btn_lbl);
 
         lv_obj_update_layout(obj);
-    }
 
-    // Determine max face size to allocate sufficient buffer initially
-    int32_t max_w = 1;
-    int32_t max_h = 1;
-    for(int i = 0; i < 6; i++) {
-        if(g_cube->faces_obj[i]) {
-            int32_t w = lv_obj_get_width(g_cube->faces_obj[i]);
-            int32_t h = lv_obj_get_height(g_cube->faces_obj[i]);
-            if(w > max_w) max_w = w;
-            if(h > max_h) max_h = h;
+        /* --- New logic: Scale and Snapshot immediately --- */
+        // 1. Set parent to wrapper and resize to wrapper size
+        lv_obj_set_parent(obj, g_wrapper_obj);
+        lv_obj_remove_flag(obj, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_set_size(obj, FACE_SNAPSHOT_SIZE, FACE_SNAPSHOT_SIZE);
+        lv_obj_align(obj, LV_ALIGN_TOP_LEFT, 0, 0);
+
+        // 2. Ensure layout is updated before snapshot
+        lv_obj_update_layout(g_wrapper_obj);
+        lv_obj_update_layout(obj);
+
+        // 3. Take Snapshot
+        g_snapshot_bufs[i] = lv_snapshot_create_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565);
+        if(g_snapshot_bufs[i]) {
+            lv_snapshot_take_to_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565, g_snapshot_bufs[i]);
         }
-    }
-    g_wrapper_obj = lv_obj_create(g_offscreen_root);
-    lv_obj_remove_style_all(g_wrapper_obj);
-    lv_obj_set_size(g_wrapper_obj, max_w, max_h);
-    // Initial size will be set later based on max face size
-    lv_obj_align(g_wrapper_obj, LV_ALIGN_TOP_LEFT, 0, 0);
-    // Make it opaque to optimize memory/perf
-    lv_obj_set_style_bg_opa(g_wrapper_obj, LV_OPA_COVER, 0);
-    lv_obj_set_style_bg_color(g_wrapper_obj, lv_color_black(), 0);
-    lv_obj_remove_flag(g_wrapper_obj, LV_OBJ_FLAG_HIDDEN); // Make sure it's "visible" on the off-screen
 
-    // Initialize wrapper and buffer with max size to avoid early reallocation
-    lv_obj_update_layout(g_wrapper_obj);
-    g_snapshot_buf = lv_snapshot_create_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565);
+        // 4. Restore (optional, but good for cleanup if needed later)
+        // Since we only use snapshots now, we can hide/move them back or just leave them.
+        // Moving back to offscreen root to keep wrapper clean for next face.
+        lv_obj_set_parent(obj, g_offscreen_root);
+        lv_obj_add_flag(obj, LV_OBJ_FLAG_HIDDEN);
+    }
 
 #if ENABLE_AUTO_ROTATION
     lv_timer_create(auto_rotate_timer_cb, 30, NULL);
