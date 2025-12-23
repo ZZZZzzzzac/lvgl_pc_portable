@@ -355,12 +355,13 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         if (!is_face_visible(face->vertex_indices, g_cube->vertices_tra))
         continue;
 
-        LV_PROFILER_BEGIN_TAG("not_double_for_loop");
+        LV_PROFILER_BEGIN_TAG("TAG1");
         // Manipulation on OFF-SCREEN objects is safe from active screen invalidation logic
         lv_obj_set_parent(face_obj, g_wrapper_obj);
         lv_obj_remove_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
         lv_obj_align(face_obj, LV_ALIGN_TOP_LEFT, 0, 0);
-
+        LV_PROFILER_END_TAG("TAG1");
+        LV_PROFILER_BEGIN_TAG("TAG2");
         // 性能优化：不再缩放face_obj。
         // 使用transform_scale会导致LVGL在渲染时申请巨大的临时图层缓冲(ARGB8888)，造成内存尖峰和抖动。
         // 改为调整wrapper大小以匹配face_obj的原始尺寸，进行1:1快照。
@@ -379,17 +380,18 @@ static void snapshot_draw_event_cb(lv_event_t * e)
 
         // Ready to snapshot, update layout to ensure rendering is correct
         lv_obj_update_layout(g_wrapper_obj);
-
+        LV_PROFILER_END_TAG("TAG2");
+        LV_PROFILER_BEGIN_TAG("TAG3");
         // not necessary: g_wrapper_obj is guaranteed to be max of all face_obj
         // if (lv_snapshot_reshape_draw_buf(g_wrapper_obj, g_snapshot_buf) != LV_RESULT_OK) {
         //         lv_obj_set_parent(face_obj, g_offscreen_root);
         //         lv_obj_add_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
         //         continue;
         // }
-
         // 3. Take Snapshot
         lv_snapshot_take_to_draw_buf(g_wrapper_obj, LV_COLOR_FORMAT_RGB565, g_snapshot_buf);
-
+        LV_PROFILER_END_TAG("TAG3");
+        LV_PROFILER_BEGIN_TAG("TAG4");
         // 4. Calculate Matrix
         const Coord2D dst_points[4] = {
             g_cube->vertices_pro[face->vertex_indices[1]],
@@ -405,15 +407,18 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         const Coord2D src_points[4] = {
             {0, 0}, {0, wrapper_h}, {wrapper_w, wrapper_h}, {wrapper_w, 0}
         };
-
+        LV_PROFILER_END_TAG("TAG4");
+        LV_PROFILER_BEGIN_TAG("TAG5");
         float matrix[3][3] = {0};
         // matrix maps screen(dst) -> texture(src)
         calculate_inverse_transform_matrix(src_points, dst_points, matrix);
-
+        LV_PROFILER_END_TAG("TAG5");
+        LV_PROFILER_BEGIN_TAG("TAG6");
         // Restore to storage
         lv_obj_set_parent(face_obj, g_offscreen_root);
         lv_obj_add_flag(face_obj, LV_OBJ_FLAG_HIDDEN);
-
+        LV_PROFILER_END_TAG("TAG6");
+        LV_PROFILER_BEGIN_TAG("TAG7");
         // 6. Draw the face
         int32_t src_w = g_snapshot_buf->header.w;
         int32_t src_h = g_snapshot_buf->header.h;
@@ -436,12 +441,13 @@ static void snapshot_draw_event_cb(lv_event_t * e)
         face_area.y1 = (int32_t)floorf(f_min_y);
         face_area.x2 = (int32_t)ceilf(f_max_x);
         face_area.y2 = (int32_t)ceilf(f_max_y);
+        LV_PROFILER_END_TAG("TAG7");
 
         // Intersect with the clip/object draw area
         lv_area_t iter_area;
         if(!_lv_area_intersect(&iter_area, &draw_area, &face_area))
             continue;
-        LV_PROFILER_END_TAG("not_double_for_loop");
+
         LV_PROFILER_BEGIN_TAG("double_for_loop");
         LV_LOG_USER("draw area: %dx%d", iter_area.x2 - iter_area.x1, iter_area.y2 - iter_area.y1);
 

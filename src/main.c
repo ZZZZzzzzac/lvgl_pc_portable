@@ -35,7 +35,7 @@
 #include "demo_direct_draw.h"
 #include "demo_snapshot_verification.h"
 
-#include "../lvgl/output/HRS_png_I8_LZ4.c"
+#include "../../output/RING3.c"
 
 /*********************
  *      DEFINES
@@ -66,7 +66,7 @@ void lv_example_get_localpic(void);
 void very_simple_demo(void)
 {
     lv_obj_t * bg = lv_image_create(lv_screen_active());
-    lv_image_set_src(bg, &HRS_png_I8_LZ4);
+    lv_image_set_src(bg, &RING3);
     lv_obj_set_pos(bg, 0, 0);
 }
 
@@ -145,8 +145,8 @@ int main(int argc, char **argv)
     // lv_demo_widgets();
     // lv_demo_benchmark();
     my_profiler_init();
-    // demo();
-    very_simple_demo();
+    demo();
+    // very_simple_demo();
     // lv_example_get_localpic();
     // lv_example_canvas_1();
     // lv_example_obj_3();

@@ -11,5 +11,5 @@ msys2
 *.log
 *.systrace
 local_pic_12.22
-lvgl/output
+output
 *.kvdat
