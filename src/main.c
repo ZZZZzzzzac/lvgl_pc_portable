@@ -23,14 +23,14 @@
   #include <unistd.h>
   #include <pthread.h>
 #endif
+#include "../src/libs/lz4_decoder/lv_lz4_decoder.h"
 #include "lvgl/lvgl.h"
 #include "lvgl/examples/lv_examples.h"
 #include "lvgl/demos/lv_demos.h"
 #include "lvgl/src/misc/lv_profiler_builtin_private.h"
 #include <SDL.h>
-
+#include "lvgl\examples\get_started\transform_3d.h"
 #include "hal/hal.h"
-
 /*********************
  *      DEFINES
  *********************/
@@ -119,6 +119,9 @@ void my_profiler_init(void)
 static void log_to_file_cb(lv_log_level_t level, const char * buf)
 {
     LV_UNUSED(level);
+
+    printf("%s", buf);
+
     if(event_log) {
         fprintf(event_log, "%s", buf);
         fflush(event_log);
@@ -135,10 +138,11 @@ int main(int argc, char **argv)
   event_log = fopen("lvgl.log", "w");
   /*Initialize LVGL*/
   lv_init();
-
+  lv_lz4_decoder_init();
+  lv_log_register_print_cb(log_to_file_cb);
   /*Initialize the HAL (display, input devices, tick) for LVGL*/
-  sdl_hal_init(298, 320);
-
+  sdl_hal_init(240, 296);
+  my_profiler_init();
   /* Run the default demo */
   /* To try a different demo or example, replace this with one of: */
   // lv_demo_benchmark();
@@ -147,7 +151,11 @@ int main(int argc, char **argv)
   // lv_example_get_started_3();
   // lv_example_get_started_4();
   // lv_example_anim_3();
-  lv_example_get_localpic();
+  // lv_example_get_localpic();
+  //lv_example_rotate();
+  //lv_example_zoom();
+  lv_example_image_4();
+  // demo();
   /* - etc. */
   // lv_demo_widgets();
 

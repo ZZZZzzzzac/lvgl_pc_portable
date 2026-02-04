@@ -41,7 +41,8 @@
  *      DEFINES
  *********************/
 #define lv_deinit_in_progress  LV_GLOBAL_DEFAULT()->deinit_in_progress
-
+#define MY_DISP_HOR_RES    240
+#define BYTE_PER_PIXEL (LV_COLOR_FORMAT_GET_SIZE(LV_COLOR_FORMAT_RGB565)) /*will be 2 for RGB565 */
 /**********************
  *      TYPEDEFS
  **********************/
@@ -121,8 +122,9 @@ lv_display_t * lv_sdl_window_create(int32_t hor_res, int32_t ver_res)
 
 #if LV_USE_DRAW_SDL == 0
     if(sdl_render_mode() == LV_DISPLAY_RENDER_MODE_PARTIAL) {
-        uint32_t palette_size = LV_COLOR_INDEXED_PALETTE_SIZE(lv_display_get_color_format(disp)) * 4;
-        uint32_t buffer_size_bytes = 32 * 1024 + palette_size;
+        // uint32_t palette_size = LV_COLOR_INDEXED_PALETTE_SIZE(lv_display_get_color_format(disp)) * 4;
+        // uint32_t buffer_size_bytes = 2 * 1024 + palette_size;
+        uint32_t buffer_size_bytes = MY_DISP_HOR_RES * 30 * BYTE_PER_PIXEL;
         dsc->buf1 = sdl_draw_buf_realloc_aligned(NULL, buffer_size_bytes);
 #if LV_SDL_BUF_COUNT == 2
         dsc->buf2 = sdl_draw_buf_realloc_aligned(NULL, buffer_size_bytes);

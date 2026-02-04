@@ -35,11 +35,16 @@
 		"tasks": [
 			{
 				"label": "Build",
-				"command": "cmake",
+				"command": "${workspaceFolder}/msys2/mingw32/bin/cmake.exe",
 				"args": [
 				  	"--build", "${command:cmake.buildDirectory}",
 				  	"--parallel", "${env:NUMBER_OF_PROCESSORS}"
 				],
+				"options": {
+					"env": {
+						"PATH": "${workspaceFolder}/msys2/mingw32/bin;${env:PATH}"
+					}
+				},
 				"group": {
 					"kind": "build",
 					"isDefault": true

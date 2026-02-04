@@ -185,7 +185,7 @@ lv_result_t lv_bin_decoder_info(lv_image_decoder_t * decoder, lv_image_decoder_d
 lv_result_t lv_bin_decoder_open(lv_image_decoder_t * decoder, lv_image_decoder_dsc_t * dsc)
 {
     LV_UNUSED(decoder);
-
+    LV_LOG_WARN("lv_bin_decoder_open");
     lv_result_t res = LV_RESULT_INVALID;
     lv_fs_res_t fs_res = LV_FS_RES_UNKNOWN;
     bool use_directly = false; /*If the image is already decoded and can be used directly*/
@@ -402,7 +402,7 @@ lv_result_t lv_bin_decoder_get_area(lv_image_decoder_t * decoder, lv_image_decod
                                     const lv_area_t * full_area, lv_area_t * decoded_area)
 {
     LV_UNUSED(decoder); /*Unused*/
-
+    LV_LOG_WARN("lv_bin_decoder_get_area");
     lv_color_format_t cf = dsc->header.cf;
     /*Check if cf is supported*/
 

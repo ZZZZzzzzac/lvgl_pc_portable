@@ -30,6 +30,9 @@ void lv_example_get_started_2(void);
 void lv_example_get_started_3(void);
 void lv_example_get_started_4(void);
 void lv_example_get_localpic(void);
+void lv_example_rotate(void);
+void lv_example_zoom(void);
+void lv_example_applestyle(void);
 /**********************
  *      MACROS
  **********************/

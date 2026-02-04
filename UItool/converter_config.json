@@ -1,0 +1,18 @@
+
+{
+  "bmp_1bit": {
+    "cf": "I1",
+    "ofmt": "C",
+    "compress": "LZ4"
+  },
+  "bmp_other": {
+    "cf": "RGB565",
+    "ofmt": "C",
+    "compress": "RLE"
+  },
+  "png": {
+    "cf": "RGB565A8",
+    "ofmt": "C",
+    "compress": "LZ4"
+  }
+}

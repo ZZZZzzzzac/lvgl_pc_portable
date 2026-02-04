@@ -78,6 +78,7 @@ if(USE_FREERTOS)
     list(APPEND MAIN_LIBS freertos_config freertos_kernel)
 else()
     list(APPEND MAIN_SOURCES src/main.c)
+    list(APPEND MAIN_SOURCES src/C_array.c)
 endif()
 
 

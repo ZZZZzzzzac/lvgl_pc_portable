@@ -594,6 +594,9 @@ static void buf_copy(lv_draw_buf_t * dest, const lv_area_t * dest_area,
         return;
     }
 
+    LV_LOG_WARN("[DRAW] Copy: dest->header.w=(%d) dest->header.h=(%d)",dest->header.w,dest->header.h);
+    LV_LOG_WARN("[DRAW] Copy: dest_area->x1=(%d)dest_area->x2=(%d) dest_area->y1=(%d) dest_area->y2=(%d)",dest_area->x1,dest_area->x2,dest_area->y1,dest_area->y2);
+
     if(src_area) src_bufc = lv_draw_buf_goto_xy(src, src_area->x1, src_area->y1);
     else src_bufc = lv_draw_buf_goto_xy(src, 0, 0);
 
